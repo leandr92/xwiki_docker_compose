@@ -16,13 +16,19 @@ cp .env.exmaple .env
 
 Перед развёртыванием создайте сети для сервисов командами:
 
-`docker network create traefik-network`
+```
+docker network create traefik-network
+```
 
-`docker network create xwiki-network`
+```
+docker network create xwiki-network
+```
 
 Развёртывание XWiki с помощью Docker Compose:
 
-`docker compose -f xwiki-traefik-letsencrypt-docker-compose.yml -p xwiki up -d`
+```
+docker compose -f xwiki-traefik-letsencrypt-docker-compose.yml -p xwiki up -d
+```
 
 ## Файл docker-compose.yml — запуск без Traefik
 
@@ -37,15 +43,32 @@ cp .env.exmaple .env
 
 Перед запуском создайте сеть (если ещё не создана):
 
-`docker network create xwiki-network`
+```
+docker network create xwiki-network
+```
 
-Запуск:
+Запуск (запускать можно без указания файла и проекта, в команде для примера):
 
-`docker compose -f docker-compose.yml -p xwiki up -d`
+```
+docker compose up -d
+```
+
+Запуск с явно указаным файлом и проектом
+```
+docker compose -f docker-compose.yml -p xwiki up -d
+```
 
 Остановка:
 
-`docker compose -f docker-compose.yml -p xwiki down`
+Если запускали с файлами и проектом по умолчанию
+```
+docker compose down
+```
+
+Если запускали с явно указаными файлом и проектом 
+```
+docker compose -f docker-compose.yml -p xwiki down
+```
 
 💡 Файл `.env` должен лежать в той же директории, что и `docker-compose.yml`.
 
@@ -85,7 +108,9 @@ cp .env.exmaple .env
 
 Чтобы сделать скрипт `xwiki-logs.sh` исполняемым, выполните команду:
 
-`chmod +x xwiki-logs.sh`
+```
+chmod +x xwiki-logs.sh
+```
 
 ## Описание скрипта xwiki-restore-database.sh
 
@@ -103,9 +128,14 @@ cp .env.exmaple .env
 
 6. **Запуск сервиса**: перезапускает сервис после завершения восстановления.
 
-Чтобы сделать скрипт `xwiki-restore-database.sh` исполняемым, выполните команду:
+Чтобы сделать скрипт 
+```
+xwiki-restore-database.sh
+``` исполняемым, выполните команду:
 
-`chmod +x xwiki-restore-database.sh`
+```
+chmod +x xwiki-restore-database.sh
+```
 
 Использование этого скрипта обеспечивает пошаговое и контролируемое восстановление базы данных из существующей резервной копии.
 
@@ -125,8 +155,13 @@ cp .env.exmaple .env
 
 6. **Запуск сервиса**: перезапускает сервис после успешного восстановления данных приложения.
 
-Чтобы сделать скрипт `xwiki-restore-application-data.sh` исполняемым, выполните команду:
+Чтобы сделать скрипт 
+```
+xwiki-restore-application-data.sh
+``` исполняемым, выполните команду:
 
-`chmod +x xwiki-restore-application-data.sh`
+```
+chmod +x xwiki-restore-application-data.sh
+```
 
 Использование этого скрипта позволяет эффективно восстанавливать данные приложения из резервной копии с корректным взаимодействием с работающим сервисом.
