@@ -1,5 +1,10 @@
 # XWiki с Let's Encrypt на Docker Compose
 
+Скопируйте файл `.env.exmaple`
+
+```
+cp .env.exmaple .env
+```
 
 ❗ Измените переменные в файле `.env` в соответствии с вашими требованиями.
 
