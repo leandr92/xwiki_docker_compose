@@ -1,160 +1,127 @@
-# XWiki with Let's Encrypt Using Docker Compose
+# XWiki с Let's Encrypt на Docker Compose
 
-[![Deployment Verification](https://github.com/heyvaldemar/xwiki-traefik-letsencrypt-docker-compose/actions/workflows/00-deployment-verification.yml/badge.svg)](https://github.com/heyvaldemar/xwiki-traefik-letsencrypt-docker-compose/actions)
 
-The badge displayed on my repository indicates the status of the deployment verification workflow as executed on the latest commit to the main branch.
+❗ Измените переменные в файле `.env` в соответствии с вашими требованиями.
 
-**Passing**: This means the most recent commit has successfully passed all deployment checks, confirming that the Docker Compose setup functions correctly as designed.
+Есть два варианта развёртывания: **с Traefik и HTTPS** (файл `xwiki-traefik-letsencrypt-docker-compose.yml`) и **без Traefik** (файл `docker-compose.yml`), см. ниже. Сейчас используется вариант запуска без Traefik, так как отключен HTTPS
 
-📙 The complete installation guide is available on my [website](https://www.heyvaldemar.com/install-xwiki-using-docker-compose/).
+## Вариант с Traefik и Let's Encrypt
 
-❗ Change variables in the `.env` to meet your requirements.
+💡 Файл `.env` должен находиться в той же директории, что и compose-файл.
 
-💡 Note that the `.env` file should be in the same directory as `xwiki-traefik-letsencrypt-docker-compose.yml`.
-
-Create networks for your services before deploying the configuration using the commands:
+Перед развёртыванием создайте сети для сервисов командами:
 
 `docker network create traefik-network`
 
 `docker network create xwiki-network`
 
-Deploy XWiki using Docker Compose:
+Развёртывание XWiki с помощью Docker Compose:
 
 `docker compose -f xwiki-traefik-letsencrypt-docker-compose.yml -p xwiki up -d`
 
-## Backups
+## Файл docker-compose.yml — запуск без Traefik
 
-The `backups` container in the configuration is responsible for the following:
+`docker-compose.yml` — **дополнительный** compose-файл для запуска XWiki **без Traefik**. Подходит для локальной разработки, тестирования или когда обратный прокси и HTTPS не нужны.
 
-1. **Database Backup**: Creates compressed backups of the PostgreSQL database using pg_dump.
-Customizable backup path, filename pattern, and schedule through variables like `POSTGRES_BACKUPS_PATH`, `POSTGRES_BACKUP_NAME`, and `BACKUP_INTERVAL`.
+**Отличия от варианта с Traefik:**
+- Нет сервиса Traefik и интеграции с Let's Encrypt.
+- XWiki доступен напрямую по порту **8080** на хосте (`http://localhost:8080` или `http://<IP>:8080`).
+- Требуется только сеть `xwiki-network` (сеть `traefik-network` не используется).
 
-2. **Application Data Backup**: Compresses and stores backups of the application data on the same schedule. Controlled via variables such as `DATA_BACKUPS_PATH`, `DATA_BACKUP_NAME`, and `BACKUP_INTERVAL`.
+**Сервисы в составе:** PostgreSQL, XWiki, контейнер резервного копирования (`backups`) — те же, что и в полном варианте; переменные из `.env` используются так же.
 
-3. **Backup Pruning**: Periodically removes backups exceeding a specified age to manage storage. Customizable pruning schedule and age threshold with `POSTGRES_BACKUP_PRUNE_DAYS` and `DATA_BACKUP_PRUNE_DAYS`.
+Перед запуском создайте сеть (если ещё не создана):
 
-By utilizing this container, consistent and automated backups of the essential components of your instance are ensured. Moreover, efficient management of backup storage and tailored backup routines can be achieved through easy and flexible configuration using environment variables.
+`docker network create xwiki-network`
 
-## xwiki-restore-database.sh Description
+Запуск:
 
-This script facilitates the restoration of a database backup:
+`docker compose -f docker-compose.yml -p xwiki up -d`
 
-1. **Identify Containers**: It first identifies the service and backups containers by name, finding the appropriate container IDs.
+Остановка:
 
-2. **List Backups**: Displays all available database backups located at the specified backup path.
+`docker compose -f docker-compose.yml -p xwiki down`
 
-3. **Select Backup**: Prompts the user to copy and paste the desired backup name from the list to restore the database.
+💡 Файл `.env` должен лежать в той же директории, что и `docker-compose.yml`.
 
-4. **Stop Service**: Temporarily stops the service to ensure data consistency during restoration.
+## Резервное копирование
 
-5. **Restore Database**: Executes a sequence of commands to drop the current database, create a new one, and restore it from the selected compressed backup file.
+Контейнер `backups` в конфигурации отвечает за следующее:
 
-6. **Start Service**: Restarts the service after the restoration is completed.
+1. **Резервная копия базы данных**: создаёт сжатые резервные копии базы данных PostgreSQL с помощью pg_dump. Путь к резервным копиям, шаблон имени файла и расписание настраиваются переменными `POSTGRES_BACKUPS_PATH`, `POSTGRES_BACKUP_NAME` и `BACKUP_INTERVAL`.
 
-To make the `xwiki-restore-database.shh` script executable, run the following command:
+2. **Резервная копия данных приложения**: сжимает и сохраняет резервные копии данных приложения по тому же расписанию. Управляется переменными `DATA_BACKUPS_PATH`, `DATA_BACKUP_NAME` и `BACKUP_INTERVAL`.
+
+3. **Очистка резервных копий**: периодически удаляет резервные копии старше заданного срока для управления местом на диске. Расписание очистки и порог возраста настраиваются переменными `POSTGRES_BACKUP_PRUNE_DAYS` и `DATA_BACKUP_PRUNE_DAYS`.
+
+Использование этого контейнера обеспечивает регулярное и автоматическое резервное копирование основных компонентов вашего экземпляра. Кроме того, гибкая настройка через переменные окружения позволяет эффективно управлять хранилищем резервных копий и настраивать расписание под свои нужды.
+
+## Описание скрипта xwiki-logs.sh
+
+Скрипт собирает и выводит логи XWiki из контейнера для диагностики и отладки, используется когда логи слишком большие для отображения в терминале:
+
+1. **Логи контейнера**: выводит вывод `docker logs` за указанный период (`--since`) с ограничением по количеству строк (`--tail`). По умолчанию — за последний час, 500 строк.
+
+2. **Хвосты лог-файлов в контейнере**: показывает последние строки из основных логов приложения:
+   - `/usr/local/tomcat/logs/xwiki.log`
+   - `/var/lib/xwiki/data/logs/xwiki.log`
+   - `/usr/local/tomcat/logs/catalina.out`
+
+3. **Поиск по паттерну**: выполняет `grep` по указанному регулярному выражению в этих же файлах (по умолчанию ищет: index, task, consumer, llm, mention, links, executor, timeout, rejected, error, exception).
+
+4. **Архив логов**: создаёт сжатый архив логов в контейнере и копирует его на хост в текущую директорию (удобно прикладывать к тикету в поддержку).
+
+**Параметры вызова** (все опциональны):
+- `$1` — паттерн для grep (по умолчанию: `index|task|consumer|llm|mention|links|executor|timeout|rejected|error|exception`);
+- `$2` — период для `docker logs --since` (по умолчанию: `1h`);
+- `$3` — количество последних строк tail (по умолчанию: `500`).
+
+**Переменные окружения**: `CONTAINER` — имя контейнера XWiki (по умолчанию: `xwiki-xwiki-1`).
+
+Чтобы сделать скрипт `xwiki-logs.sh` исполняемым, выполните команду:
+
+`chmod +x xwiki-logs.sh`
+
+## Описание скрипта xwiki-restore-database.sh
+
+Скрипт предназначен для восстановления базы данных из резервной копии:
+
+1. **Поиск контейнеров**: определяет контейнеры сервиса и резервного копирования по имени и находит их ID.
+
+2. **Список резервных копий**: выводит все доступные резервные копии базы данных по указанному пути.
+
+3. **Выбор резервной копии**: предлагает пользователю скопировать и вставить имя нужной резервной копии для восстановления базы данных.
+
+4. **Остановка сервиса**: временно останавливает сервис для обеспечения целостности данных при восстановлении.
+
+5. **Восстановление базы данных**: выполняет последовательность команд: удаление текущей базы, создание новой и восстановление из выбранного сжатого архива.
+
+6. **Запуск сервиса**: перезапускает сервис после завершения восстановления.
+
+Чтобы сделать скрипт `xwiki-restore-database.sh` исполняемым, выполните команду:
 
 `chmod +x xwiki-restore-database.sh`
 
-Usage of this script ensures a controlled and guided process to restore the database from an existing backup.
+Использование этого скрипта обеспечивает пошаговое и контролируемое восстановление базы данных из существующей резервной копии.
 
-## xwiki-restore-application-data.sh Description
+## Описание скрипта xwiki-restore-application-data.sh
 
-This script is designed to restore the application data:
+Скрипт предназначен для восстановления данных приложения:
 
-1. **Identify Containers**: Similarly to the database restore script, it identifies the service and backups containers by name.
+1. **Поиск контейнеров**: аналогично скрипту восстановления БД, находит контейнеры сервиса и резервного копирования по имени.
 
-2. **List Application Data Backups**: Displays all available application data backups at the specified backup path.
+2. **Список резервных копий данных приложения**: выводит все доступные резервные копии данных приложения по указанному пути.
 
-3. **Select Backup**: Asks the user to copy and paste the desired backup name for application data restoration.
+3. **Выбор резервной копии**: предлагает пользователю скопировать и вставить имя нужной резервной копии для восстановления данных приложения.
 
-4. **Stop Service**: Stops the service to prevent any conflicts during the restore process.
+4. **Остановка сервиса**: останавливает сервис во избежание конфликтов при восстановлении.
 
-5. **Restore Application Data**: Removes the current application data and then extracts the selected backup to the appropriate application data path.
+5. **Восстановление данных приложения**: удаляет текущие данные приложения и распаковывает выбранную резервную копию в соответствующий каталог.
 
-6. **Start Service**: Restarts the service after the application data has been successfully restored.
+6. **Запуск сервиса**: перезапускает сервис после успешного восстановления данных приложения.
 
-To make the `xwiki-restore-application-data.sh` script executable, run the following command:
+Чтобы сделать скрипт `xwiki-restore-application-data.sh` исполняемым, выполните команду:
 
 `chmod +x xwiki-restore-application-data.sh`
 
-By utilizing this script, you can efficiently restore application data from an existing backup while ensuring proper coordination with the running service.
-
-## Author
-
-hey everyone,
-
-💾 I’ve been in the IT game for over 20 years, cutting my teeth with some big names like [IBM](https://www.linkedin.com/in/heyvaldemar/), [Thales](https://www.linkedin.com/in/heyvaldemar/), and [Amazon](https://www.linkedin.com/in/heyvaldemar/). These days, I wear the hat of a DevOps Consultant and Team Lead, but what really gets me going is Docker and container technology - I’m kind of obsessed!
-
-💛 I have my own IT [blog](https://www.heyvaldemar.com/), where I’ve built a [community](https://discord.gg/AJQGCCBcqf) of DevOps enthusiasts who share my love for all things Docker, containers, and IT technologies in general. And to make sure everyone can jump on this awesome DevOps train, I write super detailed guides (seriously, they’re foolproof!) that help even newbies deploy and manage complex IT solutions.
-
-🚀 My dream is to empower every single person in the DevOps community to squeeze every last drop of potential out of Docker and container tech.
-
-🐳 As a [Docker Captain](https://www.docker.com/captains/vladimir-mikhalev/), I’m stoked to share my knowledge, experiences, and a good dose of passion for the tech. My aim is to encourage learning, innovation, and growth, and to inspire the next generation of IT whizz-kids to push Docker and container tech to its limits.
-
-Let’s do this together!
-
-## My 2D Portfolio
-
-🕹️ Click into [sre.gg](https://www.sre.gg/) — my virtual space is a 2D pixel-art portfolio inviting you to interact with elements that encapsulate the milestones of my DevOps career.
-
-## My Courses
-
-🎓 Dive into my [comprehensive IT courses](https://www.heyvaldemar.com/courses/) designed for enthusiasts and professionals alike. Whether you're looking to master Docker, conquer Kubernetes, or advance your DevOps skills, my courses provide a structured pathway to enhancing your technical prowess.
-
-🔑 [Each course](https://www.udemy.com/user/heyvaldemar/) is built from the ground up with real-world scenarios in mind, ensuring that you gain practical knowledge and hands-on experience. From beginners to seasoned professionals, there's something here for everyone to elevate their IT skills.
-
-## My Services
-
-💼 Take a look at my [service catalog](https://www.heyvaldemar.com/services/) and find out how we can make your technological life better. Whether it's increasing the efficiency of your IT infrastructure, advancing your career, or expanding your technological horizons — I'm here to help you achieve your goals. From DevOps transformations to building gaming computers — let's make your technology unparalleled!
-
-## Patreon Exclusives
-
-🏆 Join my [Patreon](https://www.patreon.com/heyvaldemar) and dive deep into the world of Docker and DevOps with exclusive content tailored for IT enthusiasts and professionals. As your experienced guide, I offer a range of membership tiers designed to suit everyone from newbies to IT experts.
-
-## My Recommendations
-
-📕 Check out my collection of [essential DevOps books](https://kit.co/heyvaldemar/essential-devops-books)\
-🖥️ Check out my [studio streaming and recording kit](https://kit.co/heyvaldemar/my-studio-streaming-and-recording-kit)\
-📡 Check out my [streaming starter kit](https://kit.co/heyvaldemar/streaming-starter-kit)
-
-## Follow Me
-
-🎬 [YouTube](https://www.youtube.com/channel/UCf85kQ0u1sYTTTyKVpxrlyQ?sub_confirmation=1)\
-🐦 [X / Twitter](https://twitter.com/heyvaldemar)\
-🎨 [Instagram](https://www.instagram.com/heyvaldemar/)\
-🐘 [Mastodon](https://mastodon.social/@heyvaldemar)\
-🧵 [Threads](https://www.threads.net/@heyvaldemar)\
-🎸 [Facebook](https://www.facebook.com/heyvaldemarFB/)\
-🧊 [Bluesky](https://bsky.app/profile/heyvaldemar.bsky.social)\
-🎥 [TikTok](https://www.tiktok.com/@heyvaldemar)\
-💻 [LinkedIn](https://www.linkedin.com/in/heyvaldemar/)\
-📣 [daily.dev Squad](https://app.daily.dev/squads/devopscompass)\
-🧩 [LeetCode](https://leetcode.com/u/heyvaldemar/)\
-🐈 [GitHub](https://github.com/heyvaldemar)
-
-## Community of IT Experts
-
-👾 [Discord](https://discord.gg/AJQGCCBcqf)
-
-## Refill My Coffee Supplies
-
-💖 [PayPal](https://www.paypal.com/paypalme/heyvaldemarCOM)\
-🏆 [Patreon](https://www.patreon.com/heyvaldemar)\
-💎 [GitHub](https://github.com/sponsors/heyvaldemar)\
-🥤 [BuyMeaCoffee](https://www.buymeacoffee.com/heyvaldemar)\
-🍪 [Ko-fi](https://ko-fi.com/heyvaldemar)
-
-🌟 **Bitcoin (BTC):** bc1q2fq0k2lvdythdrj4ep20metjwnjuf7wccpckxc\
-🔹 **Ethereum (ETH):** 0x76C936F9366Fad39769CA5285b0Af1d975adacB8\
-🪙 **Binance Coin (BNB):** bnb1xnn6gg63lr2dgufngfr0lkq39kz8qltjt2v2g6\
-💠 **Litecoin (LTC):** LMGrhx8Jsx73h1pWY9FE8GB46nBytjvz8g
-
-<div align="center">
-
-### Show some 💜 by starring some of the [repositories](https://github.com/heyValdemar?tab=repositories)!
-
-![octocat](https://user-images.githubusercontent.com/10498744/210113490-e2fad07f-4488-4da8-a656-b9abbdd8cb26.gif)
-
-</div>
-
-![footer](https://user-images.githubusercontent.com/10498744/210157572-1fca0242-8af2-46a6-bfa3-666ffd40ebde.svg)
+Использование этого скрипта позволяет эффективно восстанавливать данные приложения из резервной копии с корректным взаимодействием с работающим сервисом.
