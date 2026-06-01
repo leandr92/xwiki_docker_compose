@@ -7,9 +7,7 @@ networks:
 volumes:
   xwiki-data:
   xwiki-postgres:
-  xwiki-postgres-backup:
-  xwiki-data-backups:
-  xwiki-database-backups:
+  xwiki-backups:
   traefik-certificates:
 
 services:
@@ -152,33 +150,32 @@ services:
     restart: unless-stopped
 
   backups:
-    image: ${XWIKI_POSTGRES_IMAGE_TAG}
-    command: >-
-      sh -c 'sleep $BACKUP_INIT_SLEEP &&
-      while true; do
-        pg_dump -h postgres -p 5432 -d $XWIKI_DB_NAME -U $XWIKI_DB_USER | gzip > $POSTGRES_BACKUPS_PATH/$POSTGRES_BACKUP_NAME-$(date "+%Y-%m-%d_%H-%M").gz &&
-        tar -zcpf $DATA_BACKUPS_PATH/$DATA_BACKUP_NAME-$(date "+%Y-%m-%d_%H-%M").tar.gz $DATA_PATH &&
-        find $POSTGRES_BACKUPS_PATH -type f -mtime +$POSTGRES_BACKUP_PRUNE_DAYS | xargs rm -f &&
-        find $DATA_BACKUPS_PATH -type f -mtime +$DATA_BACKUP_PRUNE_DAYS | xargs rm -f;
-        sleep $BACKUP_INTERVAL; done'
+    image: ${XWIKI_BACKUP_IMAGE_TAG}
+    build:
+      context: ./docker/backups
+      args:
+        POSTGRES_BASE_IMAGE: ${XWIKI_POSTGRES_IMAGE_TAG}
+    command: sh /scripts/xwiki-backup-runner.sh
     volumes:
-      - xwiki-postgres-backup:/var/lib/postgresql/data
       - xwiki-data:${DATA_PATH}
-      - xwiki-data-backups:${DATA_BACKUPS_PATH}
-      - xwiki-database-backups:${POSTGRES_BACKUPS_PATH}
+      - xwiki-backups:${XWIKI_BACKUPS_PATH}
+      - ./scripts:/scripts:ro
     environment:
       XWIKI_DB_NAME: ${XWIKI_DB_NAME}
       XWIKI_DB_USER: ${XWIKI_DB_USER}
       PGPASSWORD: ${XWIKI_DB_PASSWORD}
       BACKUP_INIT_SLEEP: ${BACKUP_INIT_SLEEP}
       BACKUP_INTERVAL: ${BACKUP_INTERVAL}
-      POSTGRES_BACKUP_PRUNE_DAYS: ${POSTGRES_BACKUP_PRUNE_DAYS}
-      DATA_BACKUP_PRUNE_DAYS: ${DATA_BACKUP_PRUNE_DAYS}
-      POSTGRES_BACKUPS_PATH: ${POSTGRES_BACKUPS_PATH}
-      DATA_BACKUPS_PATH: ${DATA_BACKUPS_PATH}
+      BACKUP_PRUNE_DAYS: ${BACKUP_PRUNE_DAYS}
+      XWIKI_BACKUPS_PATH: ${XWIKI_BACKUPS_PATH}
+      XWIKI_BACKUP_NAME: ${XWIKI_BACKUP_NAME}
       DATA_PATH: ${DATA_PATH}
-      POSTGRES_BACKUP_NAME: ${POSTGRES_BACKUP_NAME}
-      DATA_BACKUP_NAME: ${DATA_BACKUP_NAME}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_PREFIX: ${S3_PREFIX:-}
     networks:
       - xwiki-network
     restart: unless-stopped
