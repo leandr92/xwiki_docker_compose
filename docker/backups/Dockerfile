@@ -13,4 +13,5 @@ RUN apt-get update \
 
 ENV PATH="/opt/xwiki-backup-venv/bin:${PATH}"
 
-USER postgres
+# Sidecar only runs pg_dump over the network; must read xwiki-data owned by the XWiki user.
+USER root

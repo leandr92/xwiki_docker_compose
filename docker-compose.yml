@@ -53,6 +53,7 @@ services:
         condition: service_healthy
 
   backups:
+    user: "0:0"
     image: ${XWIKI_BACKUP_IMAGE_TAG}
     build:
       context: ./docker/backups
