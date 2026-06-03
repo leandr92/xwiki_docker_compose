@@ -20,6 +20,7 @@ roles/**
 *pass*
 *password*
 *.txt
+!docker/backups/requirements.txt
 
 # Exclude all binaries
 *.bin
